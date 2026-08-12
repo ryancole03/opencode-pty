@@ -101,7 +101,10 @@
   "dependencies": {
     "@opencode-ai/plugin": "^1.3.13",
     "@opencode-ai/sdk": "^1.3.13",
-    "bun-pty": "^0.4.10",
+    "bun-pty": "github:ryancole03/bun-pty#39ce6fb",
     "open": "^11.0.0"
-  }
+  },
+  "trustedDependencies": [
+    "bun-pty"
+  ]
 }
