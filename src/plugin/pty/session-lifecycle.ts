@@ -1,9 +1,14 @@
 import { spawn, type IPty } from 'bun-pty'
+import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '../constants.ts'
 import { RingBuffer } from './buffer.ts'
 import type { PTYSession, PTYSessionInfo, SpawnOptions } from './types.ts'
-import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '../constants.ts'
 
 const SESSION_ID_BYTE_LENGTH = 4
+
+type CooperativePty = IPty & {
+  _readLoop: boolean
+  _startReadLoop(): Promise<void>
+}
 
 function generateId(): string {
   const hex = Array.from(crypto.getRandomValues(new Uint8Array(SESSION_ID_BYTE_LENGTH)))
@@ -106,6 +111,14 @@ export class SessionLifecycleManager {
       cwd: session.workdir,
       env,
     })
+
+    // ponytail: bun-pty 0.4.10 only yields while idle; remove when its busy loop yields upstream.
+    const cooperativeProcess = ptyProcess as CooperativePty
+    ptyProcess.onData(() => {
+      cooperativeProcess._readLoop = false
+      setTimeout(() => void cooperativeProcess._startReadLoop(), 0)
+    })
+
     session.process = ptyProcess
     session.pid = ptyProcess.pid
   }
