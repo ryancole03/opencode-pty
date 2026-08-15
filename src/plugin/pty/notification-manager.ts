@@ -1,6 +1,18 @@
+// biome-ignore-all lint/suspicious/noControlCharactersInRegex: PTY output contains ANSI controls.
 import type { PTYSession } from './types.ts'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import { NOTIFICATION_LINE_TRUNCATE, NOTIFICATION_TITLE_TRUNCATE } from '../constants.ts'
+
+const OSC_SEQUENCE = /\x1b\][^\x07]*(?:\x07|\x1b\\)/g
+const CSI_SEQUENCE = /\x1b\[[0-?]*[ -/]*[@-~]/g
+const CONTROL_CHARACTER = /[\x00-\x1f\x7f-\x9f]/g
+
+function sanitizeNotificationText(value: string): string {
+  return value
+    .replace(OSC_SEQUENCE, '')
+    .replace(CSI_SEQUENCE, '')
+    .replace(CONTROL_CHARACTER, '')
+}
 
 export class NotificationManager {
   private client: OpencodeClient | null = null
@@ -61,16 +73,17 @@ export class NotificationManager {
         const bufferLines = session.buffer.read(i, 1)
         const line = bufferLines[0]
         if (line !== undefined && line.trim() !== '') {
+          const sanitizedLine = sanitizeNotificationText(line)
           lastLine =
-            line.length > NOTIFICATION_LINE_TRUNCATE
-              ? `${line.slice(0, NOTIFICATION_LINE_TRUNCATE)}...`
-              : line
+            sanitizedLine.length > NOTIFICATION_LINE_TRUNCATE
+              ? `${sanitizedLine.slice(0, NOTIFICATION_LINE_TRUNCATE)}...`
+              : sanitizedLine
           break
         }
       }
     }
 
-    const displayTitle = session.description ?? session.title
+    const displayTitle = sanitizeNotificationText(session.description ?? session.title)
     const truncatedTitle =
       displayTitle.length > NOTIFICATION_TITLE_TRUNCATE
         ? `${displayTitle.slice(0, NOTIFICATION_TITLE_TRUNCATE)}...`

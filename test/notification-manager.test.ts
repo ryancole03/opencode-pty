@@ -158,4 +158,21 @@ describe('NotificationManager', () => {
     expect(text).toContain('Timed Out: yes')
     expect(text).toContain('Process reached its PTY timeout and was stopped automatically.')
   })
+
+  it('removes terminal control sequences from notification text', async () => {
+    const buffer = new RingBuffer()
+    buffer.append('progress\n\x1b[?25h\x1b[31mDone\x1b[0m\n')
+    const promptAsync = mock(async (_payload: PromptPayload) => {})
+    const manager = new NotificationManager()
+
+    manager.init({ session: { promptAsync } } as unknown as OpencodeClient)
+    await manager.sendExitNotification(createSession({ buffer }), 0)
+
+    const payload = promptAsync.mock.calls[0]?.[0]
+    if (!payload) throw new Error('Expected a prompt payload')
+    const text = payload.body.parts[0]?.text ?? ''
+    expect(text).toContain('Last Line: Done')
+    expect(text).not.toContain('\x1b')
+    expect(text).not.toContain('?25h')
+  })
 })
